@@ -95,7 +95,7 @@
     <message>
         <location filename="src/App.cpp" line="469"/>
         <source>Query</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">查询</translation>
     </message>
     <message>
         <location filename="src/App.cpp" line="472"/>
@@ -210,13 +210,13 @@
         <location filename="src/App.cpp" line="583"/>
         <location filename="src/App.cpp" line="795"/>
         <source>&amp;Browse</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">浏览</translation>
     </message>
     <message>
         <location filename="src/App.cpp" line="608"/>
         <location filename="src/App.cpp" line="807"/>
         <source>&amp;Connect</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">连接</translation>
     </message>
     <message>
         <location filename="src/App.cpp" line="646"/>
@@ -356,7 +356,7 @@
     <message>
         <location filename="src/Inf.cpp" line="211"/>
         <source>&amp;Connect</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">连接</translation>
     </message>
     <message>
         <location filename="src/Inf.cpp" line="213"/>

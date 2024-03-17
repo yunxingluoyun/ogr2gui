@@ -545,12 +545,12 @@ void App::evtMnuOgrHelp( void )
 
 void App::evtMnuGuiHelp( void )
 {
-	QDesktopServices::openUrl( QUrl( tr( "http://www.ogr2gui.ca/0.5/doc/index.html" ) ) );
+    QDesktopServices::openUrl( QUrl( tr( "https://github.com/yunxingluoyun/ogr2gui" ) ) );
 }
 
 void App::evtMnuAbout( void )
 {
-	QDesktopServices::openUrl( QUrl( tr( "http://www.ogr2gui.ca/" ) ) );
+    QDesktopServices::openUrl( QUrl( tr( "https://github.com/yunxingluoyun/ogr2gui" ) ) );
 }
 
 
