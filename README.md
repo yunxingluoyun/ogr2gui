@@ -5,7 +5,7 @@ OGR2GUI 是一个开源项目，为 OGR2OGR 提供图形用户界面 （GUI）�
 1. 其在Qt5+GDAL3.7.2能够正常编译；
 2. 增加ogr2gui_zh.ts支持简体中文；
 
-![界面](https://github.com/yunxingluoyun/ogr2gui/blob/master/images/%E7%95%8C%E9%9D%A2.png)
+![](https://github.com/yunxingluoyun/ogr2gui/blob/master/images/%E7%95%8C%E9%9D%A2.png)
 
 原项目地址：
 
