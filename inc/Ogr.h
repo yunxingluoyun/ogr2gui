@@ -71,6 +71,7 @@ class Ogr
 		string targetName;
 
 		string error;
+		bool targetLayerWasExisting;
 
 		/*!
 		 *	\fn bool Error( OGRErr e, string &s );
@@ -117,10 +118,9 @@ class Ogr
 		 *	\fn bool OpenDriver( string drivername, string error = 0 );
 		 *	\brief Opens target driver
 		 *	\param drivername : selected driver
-		 *	\param error : error text
 		 *	\returns true on success
 		 */
-		bool OpenDriver( string drivername, string error = 0 );
+		bool OpenDriver( const string &drivername );
 
 		/*!
 		 *	\fn bool OpenTarget( string filename, int projection = 0, bool update = 0 );
@@ -130,7 +130,7 @@ class Ogr
 		 *	\param update : update mode
 		 *	\returns true on success
 		*/
-		bool OpenTarget( string filename, int projection = 0, bool update = 0 );
+		bool OpenTarget( const string &filename, int projection = 0, bool update = 0 );
 
 		/*!
 		 *	\fn bool CloseTarget( void );
@@ -145,7 +145,7 @@ class Ogr
 		 *	\param query : source sql query
 		 *	\returns true on success
 		 */
-		bool Execute( string = 0 );
+		bool Execute( const string &query = string() );
 
 		/*!
 		 *	\fn bool Prepare( int &nbFeat, string query );
@@ -154,7 +154,7 @@ class Ogr
 		 *	\param query : source sql query
 		 *	\returns true on success
 		 */
-		bool Prepare( int &nbFeat, string = 0 );
+		bool Prepare( int &nbFeat, const string &query = string() );
 
 		/*!
 		 *	\fn bool Process( void );
@@ -162,6 +162,13 @@ class Ogr
 		 *	\returns true on success
 		 */
 		bool Process( void );
+
+		/*!
+		 *	\fn const string &GetLastError( void ) const;
+		 *	\brief Returns the last OGR error
+		 *	\returns error text
+		 */
+		const string &GetLastError( void ) const;
 };
 
 #endif

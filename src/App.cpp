@@ -33,7 +33,11 @@
 #include <QPushButton>
 #include <QFileDialog>
 #include <QApplication>
+#include <QDesktopServices>
+#include <QDir>
 #include <QMetaObject>
+#include <QTranslator>
+#include <QUrl>
 
 App::App( QWidget *widget ) : QMainWindow( widget )
 {
@@ -50,9 +54,29 @@ App::App( QWidget *widget ) : QMainWindow( widget )
 
 App::~App( void )
 {
-	delete [] *formats;
-	delete [] *databases;
-	delete [] *projections;
+	delete ogr;
+	delete inf;
+
+	for( int i = 0; i < formatsCount; i ++ )
+	{
+		delete [] formats[ i ];
+	}
+
+	delete [] formats;
+
+	for( int i = 0; i < databasesCount; i ++ )
+	{
+		delete [] databases[ i ];
+	}
+
+	delete [] databases;
+
+	for( int i = 0; i < projectionsCount; i ++ )
+	{
+		delete [] projections[ i ];
+	}
+
+	delete [] projections;
 }
 
 void App::InitData( void )
@@ -160,9 +184,9 @@ void App::InitMenu( void )
 
 void App::InitLayout( void )
 {
-	theLayout = new QVBoxLayout( thePanel );
+		theLayout = new QVBoxLayout( thePanel );
 	{
-		theLayout->setMargin( 7 );
+		theLayout->setContentsMargins( 7, 7, 7, 7 );
 		theLayout->setSpacing( 7 );
 
 		grpSource = new QGroupBox( thePanel );
@@ -171,7 +195,7 @@ void App::InitLayout( void )
 
 			lytSource = new QGridLayout();
 			{
-				lytSource->setMargin( 7 );
+				lytSource->setContentsMargins( 7, 7, 7, 7 );
 				lytSource->setSpacing( 7 );
 
 				lytSourceInput = new QHBoxLayout();
@@ -537,6 +561,14 @@ void App::UpdateParameters( void )
 	txtOutput->setText( parameters );
 }
 
+void App::UpdateExecuteState( void )
+{
+	const bool hasSource = ! txtSourceName->text().trimmed().isEmpty() && ! fileList.isEmpty();
+	const bool hasTarget = ! txtTargetName->text().trimmed().isEmpty();
+
+	btnExecute->setEnabled( hasSource && hasTarget );
+}
+
 
 void App::evtMnuOgrHelp( void )
 {
@@ -558,6 +590,8 @@ void App::evtRadSourceFile( void )
 {
 	btnSourceName->setText( tr( "&Open" ) );
 
+	fileList.clear();
+
 	cmbSourceFormat->clear();
 
 	for( int i = 0; i < formatsCount; i ++ )
@@ -577,11 +611,16 @@ void App::evtRadSourceFile( void )
 
 	txtSourceProj->setEnabled( true );
 	txtSourceQuery->setEnabled( true );
+
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtRadSourceFolder( void )
 {
 	btnSourceName->setText( tr( "&Browse" ) );
+
+	fileList.clear();
 
 	cmbSourceFormat->clear();
 
@@ -602,11 +641,16 @@ void App::evtRadSourceFolder( void )
 
 	txtSourceProj->setEnabled( true );
 	txtSourceQuery->setEnabled( true );
+
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtRadSourceDatabase( void )
 {
 	btnSourceName->setText( tr( "&Connect" ) );
+
+	fileList.clear();
 
 	cmbSourceFormat->clear();
 
@@ -627,10 +671,13 @@ void App::evtRadSourceDatabase( void )
 
 	txtSourceProj->setEnabled( true );
 	txtSourceQuery->setEnabled( true );
+
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 
-void App::evtCmbSourceFormat( int i )
+void App::evtCmbSourceFormat( int )
 {
 	txtSourceName->clear();
 
@@ -646,7 +693,7 @@ void App::evtTxtSourceName( void )
 {
 	if( txtSourceName->text().startsWith( tr( "file://" ) ) )
 	{
-		txtSourceName->setText( QUrl( txtSourceName->text() ).authority().trimmed() );
+		txtSourceName->setText( QUrl( txtSourceName->text() ).toLocalFile() );
 	}
 
 	string name = txtSourceName->text().toStdString();
@@ -683,6 +730,7 @@ void App::evtTxtSourceName( void )
 	}
 
 	UpdateParameters();
+	UpdateExecuteState();
 }
 
 void App::evtBtnSourceName( void )
@@ -727,6 +775,11 @@ void App::evtBtnSourceName( void )
 			txtSourceProj->setEnabled( false );
 			txtSourceQuery->setEnabled( false );
 		}
+		else
+		{
+			txtSourceProj->setEnabled( true );
+			txtSourceQuery->setEnabled( true );
+		}
 	}
 	else if( radSourceDatabase->isChecked() )
 	{
@@ -762,10 +815,16 @@ void App::evtBtnSourceName( void )
 		}
 		else
 		{
+			txtSourceProj->setEnabled( true );
+			txtSourceQuery->setEnabled( true );
+
 			radTargetFile->setEnabled( true );
 			radTargetFile->setChecked( true );
 		}
 	}
+
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtTxtSourceQuery( void )
@@ -789,6 +848,9 @@ void App::evtRadTargetFile( void )
 	txtTargetProj->clear();
 
 	cmbTargetProj->setCurrentIndex( 0 );
+
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtRadTargetFolder( void )
@@ -801,6 +863,13 @@ void App::evtRadTargetFolder( void )
 	{
 		cmbTargetFormat->addItem( formats[ i ][ 0 ] );
 	}
+
+	txtTargetName->clear();
+	txtTargetProj->clear();
+	cmbTargetProj->setCurrentIndex( 0 );
+
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtRadTargetDatabase( void )
@@ -813,17 +882,25 @@ void App::evtRadTargetDatabase( void )
 	{
 		cmbTargetFormat->addItem( databases[ i ][ 0 ] );
 	}
+
+	txtTargetName->clear();
+	txtTargetProj->clear();
+	cmbTargetProj->setCurrentIndex( 0 );
+
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtCmbTargetFormat( void )
 {
 	txtTargetName->clear();
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtTxtTargetName( void )
 {
-	btnExecute->setEnabled( true );
-
+	UpdateExecuteState();
 	UpdateParameters();
 }
 
@@ -864,7 +941,8 @@ void App::evtBtnTargetName( void )
 		txtTargetName->setText( QFileDialog::getSaveFileName( this, tr( "Target File" ), tr( "" ), type ) );
 	}
 
-	btnExecute->setEnabled( true );
+	UpdateExecuteState();
+	UpdateParameters();
 }
 
 void App::evtTxtTargetProj( void )
@@ -906,7 +984,6 @@ void App::evtRadTargetUpdate( void )
 
 void App::evtBtnExecute( void )
 {
-	QString name;
 	QString sourcename;
 	QString targetname;
 
@@ -914,13 +991,16 @@ void App::evtBtnExecute( void )
 	string query;
 	string error;
 
-	int featuresCount = 0;
-	int progress = 0;
+	const bool updateExisting = radTargetAppend->isChecked() || radTargetUpdate->isChecked();
+	const string sourceQuery = txtSourceQuery->isEnabled() ? txtSourceQuery->text().toStdString() : string();
 
 	txtOutput->clear();
 
 	for( int i = 0; i < fileList.size(); i ++ )
 	{
+		int featuresCount = 0;
+		int progress = 0;
+
 		if( radSourceFile->isChecked() )
 		{
 			sourcename = txtSourceName->text();
@@ -941,11 +1021,17 @@ void App::evtBtnExecute( void )
 
 		if( ogr->OpenSource( sourcename.toStdString(), epsg, query, error ) )
 		{
-			if( ogr->OpenDriver( cmbTargetFormat->currentText().toStdString(), error ) )
+			if( ogr->OpenDriver( cmbTargetFormat->currentText().toStdString() ) )
 			{
-				if( ogr->OpenTarget( targetname.toStdString(), atoi( projections[ cmbTargetProj->currentIndex() ][ 0 ].toStdString().c_str() ) ) )
+				if( ogr->OpenTarget( targetname.toStdString(), atoi( projections[ cmbTargetProj->currentIndex() ][ 0 ].toStdString().c_str() ), updateExisting ) )
 				{
-					ogr->Prepare( featuresCount, "" );
+					if( ! ogr->Prepare( featuresCount, sourceQuery ) )
+					{
+						txtOutput->append( tr( "\n * " ) + QString::fromStdString( ogr->GetLastError() ) + tr( "\n" ) );
+						ogr->CloseTarget();
+						ogr->CloseSource();
+						continue;
+					}
 
 					theProgress->setMinimum( 0 );
 					theProgress->setMaximum( featuresCount );
@@ -957,27 +1043,38 @@ void App::evtBtnExecute( void )
 
 						theProgress->setValue( progress );
 					}
-					
+
+					const QString ogrError = QString::fromStdString( ogr->GetLastError() );
+
 					ogr->CloseTarget();
 					ogr->CloseSource();
 
 					theProgress->setValue( 0 );
 
-					txtOutput->append( tr( "successful.\n" ) );
+					if( ogrError.isEmpty() )
+					{
+						txtOutput->append( tr( "successful.\n" ) );
+					}
+					else
+					{
+						txtOutput->append( tr( "\n * " ) + ogrError + tr( "\n" ) );
+					}
 				}
 				else
 				{
-					txtOutput->append( tr( "\n * unable to open target !\n" ) );
+					txtOutput->append( tr( "\n * " ) + QString::fromStdString( ogr->GetLastError() ) + tr( "\n" ) );
+					ogr->CloseSource();
 				}
 			}
 			else
 			{
-				txtOutput->append( tr( "\n * unable to open driver !\n" ) );
+				txtOutput->append( tr( "\n * " ) + QString::fromStdString( ogr->GetLastError() ) + tr( "\n" ) );
+				ogr->CloseSource();
 			}
 		}
 		else
 		{
-			txtOutput->append( tr( "\n * unable to open source !\n" ) );
+			txtOutput->append( tr( "\n * " ) + QString::fromStdString( error ) + tr( "\n" ) );
 		}
 	}
 }

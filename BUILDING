@@ -1,45 +1,34 @@
-ogr2gui 0.6					                 dev@ogr2gui.ca
+ogr2gui 0.6 CMake build notes
 -------------------------------------------------------------------------------
-- proj.4
 
-	> ./configure 	
-	> make
-	> make install
+Tested environment
 
-- postgresql-8.4.1
+	- Qt 6.10.2
+	- GDAL 3.12.3
 
-	> ./configure
-		--disable-shared
-		--prefix=/usr/local 
-		--with-includes=/usr/local/include 
-		--with-libs=/usr/local/lib
-		--without-zlib
-	> make
-	> make install
+Compatibility target
 
-- gdal-1.6.2
+	- Qt 5+
+	- GDAL 3.7.2+
 
-	> ./configure 
-		--disable-shared 
-		--with-static-proj4=/usr/local/
-	> make
-	> make install
+macOS / Linux
 
-- qt-2009.03
-	
-	> ./configure 
-		-static
-		-release
-		-no-webkit
-		-no-exceptions
-		-qt-sql-psql
-		-I /usr/local/include
-		-L /usr/local/lib	
-	> make
-	> make install
+	1. Install CMake, Qt and GDAL development files
+	2. Build:
 
-- ogr2gui-0.6
+		> cmake -S . -B build
+		> cmake --build build
 
-	> qmake
-	> make
-	> make install
+Windows
+
+	1. Install CMake, Qt and GDAL
+	2. If needed, set `CMAKE_PREFIX_PATH` for Qt and `GDAL_ROOT` for GDAL
+	3. Build:
+
+		> cmake -S . -B build
+		> cmake --build build
+
+Notes
+
+	- The qmake project files have been removed in favor of a single CMake entrypoint.
+	- The executable copies `ogr2gui_zh.qm` next to the runtime binary so the existing translator loading code still works.

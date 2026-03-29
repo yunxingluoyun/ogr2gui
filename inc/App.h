@@ -233,6 +233,12 @@ class App : public QMainWindow
 		 */
 		void UpdateParameters( void );
 
+		/*!
+		 *	\fn void UpdateExecuteState( void );
+		 *	\brief Enables execute only when both source and target are ready
+		 */
+		void UpdateExecuteState( void );
+
 
 	private slots :
 

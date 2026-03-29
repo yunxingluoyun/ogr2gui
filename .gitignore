@@ -1,0 +1,13 @@
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+Makefile
+.qmake.stash
+*.o
+moc_*.cpp
+moc_*.o
+moc_predefs.h
+*.app

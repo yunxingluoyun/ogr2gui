@@ -29,18 +29,36 @@
 
 #include "../inc/Ogr.h"
 
-Ogr::Ogr( void )
+#include <cstdio>
+
+Ogr::Ogr( void ) :
+	formatDriver( NULL ),
+	sourceData( NULL ),
+	targetData( NULL ),
+	squeryLayer( NULL ),
+	sourceLayer( NULL ),
+	targetLayer( NULL ),
+	sourceSRS( NULL ),
+	targetSRS( NULL ),
+	sourceLayerDefn( NULL ),
+	sourceLayerGeom( wkbUnknown ),
+	sourceGeom( NULL ),
+	targetLayerWasExisting( false )
 {
 	OGRRegisterAll();
 }
 
 Ogr::~Ogr( void )
 {
-
+	CloseTarget();
+	CloseSource();
 }
 
 bool Ogr::OpenSource( string filename, string &epsg, string &query, string &error )
 {
+	CloseSource();
+
+	error.clear();
 	sourceSRS = NULL;
 
 	sourceName = filename;
@@ -93,9 +111,23 @@ bool Ogr::OpenSource( string filename, string &epsg, string &query, string &erro
 
 bool Ogr::CloseSource( void )
 {
+	if( sourceData != NULL && squeryLayer != NULL )
+	{
+		OGR_DS_ReleaseResultSet( sourceData, squeryLayer );
+		squeryLayer = NULL;
+	}
+
 	if( sourceData != NULL )
 	{
 		OGR_DS_Destroy( sourceData );
+		sourceData = NULL;
+		sourceLayer = NULL;
+		sourceLayerDefn = NULL;
+		sourceSRS = NULL;
+		sourceGeom = NULL;
+
+		sourceName.clear();
+		sourceLayerName.clear();
 	}
 	else
 	{
@@ -105,8 +137,9 @@ bool Ogr::CloseSource( void )
 	return true;
 }
 
-bool Ogr::OpenDriver( string drivername, string error )
+bool Ogr::OpenDriver( const string &drivername )
 {
+	error.clear();
 	formatDriver = OGRGetDriverByName( drivername.c_str() );
 
 	if( formatDriver == NULL )
@@ -119,11 +152,15 @@ bool Ogr::OpenDriver( string drivername, string error )
 	return true;
 }
 
-bool Ogr::OpenTarget( string filename, int projection, bool update )
+bool Ogr::OpenTarget( const string &filename, int projection, bool update )
 {
 	struct stat fileInfo;
 
+	CloseTarget();
+
+	error.clear();
 	targetSRS = NULL;
+	targetLayerWasExisting = false;
 	
 	targetName = filename;
 
@@ -134,6 +171,7 @@ bool Ogr::OpenTarget( string filename, int projection, bool update )
 		if( Error( OSRImportFromEPSG( targetSRS, projection ), error ) )
 		{
 			error.insert( 0, "unable to create spatial reference : " );
+			return false;
 		}
 	}
 
@@ -142,6 +180,25 @@ bool Ogr::OpenTarget( string filename, int projection, bool update )
 		if( stat( targetName.c_str(), &fileInfo ) == 0 )
 		{
 			targetData = OGR_Dr_Open( formatDriver, targetName.c_str(), 1 );
+
+			if( targetData != NULL )
+			{
+				if( OGR_DS_GetLayerCount( targetData ) == 1 )
+				{
+					targetLayer = OGR_DS_GetLayer( targetData, 0 );
+				}
+				else
+				{
+					targetLayer = OGR_DS_GetLayerByName( targetData, sourceLayerName.c_str() );
+
+					if( targetLayer == NULL && OGR_DS_GetLayerCount( targetData ) > 0 )
+					{
+						targetLayer = OGR_DS_GetLayer( targetData, 0 );
+					}
+				}
+
+				targetLayerWasExisting = ( targetLayer != NULL );
+			}
 		}
 		else
 		{
@@ -154,9 +211,10 @@ bool Ogr::OpenTarget( string filename, int projection, bool update )
 	{	
 		if( stat( targetName.c_str(), &fileInfo ) == 0 )
 		{
-			if( remove( targetName.c_str() ) != 0 )
+			if( ! S_ISDIR( fileInfo.st_mode ) && remove( targetName.c_str() ) != 0 )
 			{
-				error = "unable to delete source data";
+				error = "unable to delete target data";
+				return false;
 			}
 		}
 
@@ -165,20 +223,10 @@ bool Ogr::OpenTarget( string filename, int projection, bool update )
 
 	if( targetData != NULL )
 	{
-		if( update )
+		if( targetLayer == NULL )
 		{
-			targetLayer = OGR_DS_GetLayer( targetData, 0 );
-		}
-		else
-		{
-			if( targetSRS != NULL )
-			{
-				targetLayer = OGR_DS_CreateLayer( targetData, sourceLayerName.c_str(), targetSRS, sourceLayerGeom, NULL );
-			}
-			else
-			{
-				targetLayer = OGR_DS_CreateLayer( targetData, sourceLayerName.c_str(), sourceSRS, sourceLayerGeom, NULL );
-			}
+			OGRSpatialReferenceH layerSRS = targetSRS != NULL ? targetSRS : sourceSRS;
+			targetLayer = OGR_DS_CreateLayer( targetData, sourceLayerName.c_str(), layerSRS, sourceLayerGeom, NULL );
 		}
 	}
 	else
@@ -188,14 +236,31 @@ bool Ogr::OpenTarget( string filename, int projection, bool update )
 		return false;
 	}
 
+	if( targetLayer == NULL )
+	{
+		error = "unable to create target layer";
+		return false;
+	}
+
 	return true;
 }
 
 bool Ogr::CloseTarget( void )
 {
+	if( targetSRS != NULL )
+	{
+		OSRDestroySpatialReference( targetSRS );
+		targetSRS = NULL;
+	}
+
 	if( targetData != NULL )
 	{
 		OGR_DS_Destroy( targetData );
+		targetData = NULL;
+		targetLayer = NULL;
+		targetLayerWasExisting = false;
+
+		targetName.clear();
 	}
 	else
 	{
@@ -205,7 +270,7 @@ bool Ogr::CloseTarget( void )
 	return true;
 }
 
-bool Ogr::Execute( string query )
+bool Ogr::Execute( const string &query )
 {
 	int featuresCount = 0;
 
@@ -225,13 +290,21 @@ bool Ogr::Execute( string query )
 	return true;
 }
 
-bool Ogr::Prepare( int &featuresCount, string query )
+bool Ogr::Prepare( int &featuresCount, const string &query )
 {
+	error.clear();
+
 	OGRFeatureDefnH featDefn = OGR_L_GetLayerDefn( sourceLayer );
+	OGRFeatureDefnH targetDefn = OGR_L_GetLayerDefn( targetLayer );
 
 	for( int i = 0; i < OGR_FD_GetFieldCount( sourceLayerDefn ); i ++ )
 	{
 		OGRFieldDefnH field = OGR_FD_GetFieldDefn( featDefn, i );
+
+		if( targetLayerWasExisting && OGR_FD_GetFieldIndex( targetDefn, OGR_Fld_GetNameRef( field ) ) >= 0 )
+		{
+			continue;
+		}
 
 		if( Error( OGR_L_CreateField( targetLayer, field, 0 ), error ) )
 		{
@@ -239,13 +312,27 @@ bool Ogr::Prepare( int &featuresCount, string query )
 		}
 	}
 
+	if( squeryLayer != NULL )
+	{
+		OGR_DS_ReleaseResultSet( sourceData, squeryLayer );
+		squeryLayer = NULL;
+		sourceLayer = OGR_DS_GetLayer( sourceData, 0 );
+		sourceLayerDefn = OGR_L_GetLayerDefn( sourceLayer );
+	}
+
 	if( query.size() > 0 )
 	{
-		OGRLayerH squeryLayer = OGR_DS_ExecuteSQL( sourceData, query.c_str(), NULL, "" );
+		squeryLayer = OGR_DS_ExecuteSQL( sourceData, query.c_str(), NULL, "" );
 
 		if( squeryLayer != NULL )
 		{
 			sourceLayer = squeryLayer;
+			sourceLayerDefn = OGR_L_GetLayerDefn( sourceLayer );
+		}
+		else
+		{
+			error = "unable to execute source query";
+			return false;
 		}
 	}
 
@@ -258,16 +345,26 @@ bool Ogr::Prepare( int &featuresCount, string query )
 
 bool Ogr::Process( void )
 {
+	error.clear();
+
 	OGRFeatureH feature;
 
 	if( ( ( feature = OGR_L_GetNextFeature( sourceLayer ) ) != NULL ) )
 	{
-		if( targetSRS )
+		if( targetSRS && OGR_F_GetGeometryRef( feature ) != NULL )
 		{
-			Error( OGR_G_TransformTo( OGR_F_GetGeometryRef( feature ), targetSRS ), error );
+			if( Error( OGR_G_TransformTo( OGR_F_GetGeometryRef( feature ), targetSRS ), error ) )
+			{
+				OGR_F_Destroy( feature );
+				return false;
+			}
 		}
 
-		Error( OGR_L_CreateFeature( targetLayer, feature ), error );
+		if( Error( OGR_L_CreateFeature( targetLayer, feature ), error ) )
+		{
+			OGR_F_Destroy( feature );
+			return false;
+		}
 
 		OGR_F_Destroy( feature );
 	}
@@ -277,6 +374,11 @@ bool Ogr::Process( void )
 	}
 
 	return true;
+}
+
+const string &Ogr::GetLastError( void ) const
+{
+	return error;
 }
 
 bool Ogr::Error( OGRErr code, string &type )
